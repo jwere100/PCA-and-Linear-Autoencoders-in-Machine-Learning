@@ -19,14 +19,3 @@ def load_mnist():
     y = np.array(mnist.target, dtype=np.int64)
 
     return X, y
-
-
-# Test the function
-if __name__ == "__main__":
-    X, y = load_mnist()
-    print(f"X shape: {X.shape}")
-    print(f"y shape: {y.shape}")
-    print(f"X data type: {X.dtype}")
-    print(f"y data type: {y.dtype}")
-    print(f"First label: {y[0]}")
-    print(f"Pixel value range: {X.min()} to {X.max()}")
