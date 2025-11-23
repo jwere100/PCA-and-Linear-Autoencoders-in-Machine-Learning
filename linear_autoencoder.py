@@ -1,0 +1,1 @@
+# linear_autoencoder.py provides the implementation and training of the linear autoencoder

@@ -1,0 +1,1 @@
+# data_loader.py loads in the raw MNIST data
