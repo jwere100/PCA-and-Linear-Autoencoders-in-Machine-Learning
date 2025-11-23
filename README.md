@@ -13,9 +13,33 @@ concepts in linear algebra such as eigendecomposition and linear transformations
 
 **Why These Questions Matter:** ML models require very large datasets. Finding ways to compress the data is very important. We also operate in a compute-constrained environment, so, all else equal, we want to find the methods that consume the lowest amounts of computational resources. Extracting meaningful, low-dimensional representations improves efficiency, interpretability, and downstream prediction. This project investigates two major approaches to dimensionality reduction [principal component analysis (PCA) and linear autoencoders] to understand their mathematical connection and performance trade-offs. PCA underlies techniques such as image compression and risk analysis, while autoencoders form the foundation of modern generative and self-supervised neural networks.
 
-**Authors**: 
+**Authors**:
 - Roger Fortunato, rlf2157@columbia.edu
-- Nick Meyer, njm2179@columbia.edu 
-- Ayo Adetayo, aa5886@columbia.edu 
+- Nick Meyer, njm2179@columbia.edu
+- Ayo Adetayo, aa5886@columbia.edu
 - Joshua Were, jow2112@columbia.edu
-- Arjun Purohit, ap4670@columbia.edu 
+- Arjun Purohit, ap4670@columbia.edu
+
+## Setup
+
+To set up the development environment:
+
+1. **Create a virtual environment:**
+   ```bash
+   python -m venv .venv
+   ```
+
+2. **Activate the virtual environment:**
+   - On macOS/Linux:
+     ```bash
+     source .venv/bin/activate
+     ```
+   - On Windows:
+     ```bash
+     .venv\Scripts\activate
+     ```
+
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
