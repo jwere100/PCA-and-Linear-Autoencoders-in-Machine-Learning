@@ -21,30 +21,21 @@ class AutoEncoder(nn.Module):
     def __init__(self):
         super().__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(4784, 392 ),
-            nn.ReLU(),
+            nn.Linear(784, 392 ),
             nn.Linear(392, 196),
-            nn.ReLU(),
             nn.Linear(196,64),
-            nn.ReLU(),
             nn.Linear(64,32),
-            nn.ReLU(),
+            nn.Linear(32, 16),
             nn.Linear(16, 8),
-            nn.ReLU(),
+
         )
         self.decoder = nn.Sequential(
             nn.Linear(8, 16),
-            nn.ReLU(),
             nn.Linear(16,32),
-            nn.ReLU(),
             nn.Linear(32, 64),
-            nn.ReLU(),
             nn.Linear(64, 128),
-            nn.ReLU(),
             nn.Linear(128, 392),
-            nn.ReLU(),
             nn.Linear(392, 784),
-            nn.ReLU(),
         )
 
 
@@ -68,26 +59,26 @@ Hyperparamters: A set of modifiable values that impacts the training loop.
 The difference between a hyperparameter and other components
 of a model is that hyperparameters are constants that are easily modifiable.
 """
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = AutoEncoder().to(device)
 epochs = 30
-
-criterion = nn.BCEWithLogitsLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+learning_rate = .001
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
 #Define our Loss and optimizer
 #Sample Loss function, might change later
-criterion = nn.BCELossWithLogits()
+
+criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(),lr=learning_rate)
 
 outputs = []
 losses = []
 
 for epoch in range(epochs):
-    for ind, size in train_loader:
+    for images, size in train_loader:
         images = images.view(-1,28*28).to(device)
         reconst = model(images)
         loss = criterion(reconst,images)
@@ -100,5 +91,3 @@ for epoch in range(epochs):
 
         outputs.append((epoch, images, reconst))
     print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item():.6f}")
-
-
