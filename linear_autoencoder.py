@@ -20,24 +20,8 @@ class AutoEncoder(nn.Module):
     The forward method runs data through the encoder and decoder and returns it. """
     def __init__(self):
         super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(784, 392 ),
-            nn.Linear(392, 196),
-            nn.Linear(196,64),
-            nn.Linear(64,32),
-            nn.Linear(32, 16),
-            nn.Linear(16, 8),
-
-        )
-        self.decoder = nn.Sequential(
-            nn.Linear(8, 16),
-            nn.Linear(16,32),
-            nn.Linear(32, 64),
-            nn.Linear(64, 128),
-            nn.Linear(128, 392),
-            nn.Linear(392, 784),
-        )
-
+        self.encoder = nn.Linear(784, 256)
+        self.decoder = nn.Linear(256, 784)
 
     def forward(self, x : torch.Tensor) -> torch.Tensor:
         return self.decoder(self.encoder(x))
