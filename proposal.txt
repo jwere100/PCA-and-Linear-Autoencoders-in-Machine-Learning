@@ -1,0 +1,86 @@
+[cite_start]MATH UN2015 Project Proposal [cite: 1]
+[cite_start]Dr Tommaso Botta [cite: 1]
+
+1. [cite_start]Project Prospectus Format [cite: 2]
+[cite_start]Project Title: Dimensionality Reduction Techniques: A Comparison of Principal Component Analysis and Linear Autoencoding on the MNIST Dataset [cite: 3]
+Group Members: Roger Fortunato, rlf2157; Nick Meyer, njm2179; Ayo Adetayo, aa5886; Joshua Were, jow2112; [cite_start]Arjun Purohit, ap4670 [cite: 4, 5]
+[cite_start]Date of Submission: 11/17/2025 [cite: 5]
+
+2. [cite_start]Topic and Research Questions [cite: 6]
+[cite_start]General Topic: This project explores the mathematical and empirical relationship between Principal Component Analysis (PCA) and linear autoencoders as methods for dimensionality reduction[cite: 7]. [cite_start]PCA identifies an optimal low-dimensional subspace by performing eigendecomposition on the covariance matrix, producing an exact analytical solution[cite: 8]. [cite_start]A linear autoencoder attempts to learn an equivalent projection through gradient descent, optimizing reconstruction error over a bottleneck architecture[cite: 9]. [cite_start]Although Baldi and Hornik (1989) demonstrate that the linear autoencoder's global optimum corresponds to the PCA subspace, few empirical studies test how reliably this equivalence holds in practical settings[cite: 10]. [cite_start]We aim to investigate: (1) whether linear autoencoders reliably converge to the same subspace as PCA in practice, (2) how training dynamics and hyperparameters affect this convergence, and (3) how the computational efficiency and practical performance of both methods compare on real datasets[cite: 11].
+
+[cite_start]Key Questions: [cite: 12]
+1. [cite_start]While proven theoretically, do linear autoencoders converge to the same subspace representations in practice? [cite: 13]
+2. [cite_start]How do optimization choices (learning rate schedule, initialization strategy, batch size, and optimizer) affect a linear autoencoder's ability to approximate the PCA subspace? [cite: 14]
+3. [cite_start]What metrics can accurately quantify subspace similarity, such as principal angles or canonical correlations? [cite: 15] [cite_start]How can we quantify the similarity between learned autoencoder weights and PCA eigenvectors? [cite: 16, 17]
+4. [cite_start]How do the two approaches compare in terms of: (a) computational cost (training time, memory usage), (b) reconstruction quality, and (c) downstream task performance (e.g., classification accuracy)? [cite: 18]
+
+[cite_start]Why These Questions Matter: Dimensionality reduction is fundamental to modern machine learning, enabling efficient processing of high-dimensional data while preserving essential information[cite: 19]. [cite_start]While PCA provides an analytical solution through linear algebra, autoencoders learn the same transformation through neural network optimization[cite: 20]. [cite_start]Despite their theoretical equivalence (Baldi & Hornik, 1989), detailed practical comparisons are scarce in the literature[cite: 21]. [cite_start]This project fills that gap by empirically evaluating convergence reliability, computational efficiency, and practical performance[cite: 22]. [cite_start]Understanding these trade-offs has direct implications for practitioners choosing between classical analytical methods and modern learning-based approaches across a range of applications[cite: 23].
+
+3. [cite_start]Approach and Expected Outcomes [cite: 25]
+[cite_start]How You Will Answer These Questions: We will conduct a comparison of PCA and linear autoencoders on image data, focusing our analysis on the MNIST dataset of handwritten digits[cite: 26]. This dataset consists of 70,000 images, each 28x28 pixels. [cite_start]This means the raw information consists of 784 dimensions[cite: 27]. [cite_start]We will use NumPy for computations and sklearn for verification of the PCA[cite: 28]. [cite_start]We will build the autoencoder with PyTorch and train it via mean squared error (MSE) reconstruction loss with gradient descent[cite: 29]. [cite_start]If time allows, we will also experiment with different hyperparameters[cite: 30]. [cite_start]To compare results, we will test different dimensionality reductions, measuring the error, visualizing the quality, and comparing autoencoder weights to PCA eigenvectors[cite: 31]. [cite_start]We will then apply both methods to some classification task, assess their performance, and measure the associated computational costs[cite: 32].
+
+[cite_start]Mathematical Methods: We will use, at a minimum, the below concepts from linear algebra in our project: [cite: 33]
+* [cite_start]Covariance matrices to measure the correlations in the high-dimensional data [cite: 34]
+* [cite_start]Eigenvalue decomposition to find the principal directions of variance [cite: 34]
+* [cite_start]Matrix projections and linear transformations to map data to the lower-dimensional subspaces [cite: 35]
+* [cite_start]Matrix multiplication to reconstruct the original representational space [cite: 36]
+
+[cite_start]Computational Tools: We will build our project in Python, use Git for version control, and plan to use a few tools to aid in our analysis: [cite: 37]
+* [cite_start]NumPy for the manual PCA implementation and various linear algebra operations and matrix computations[cite: 38].
+* [cite_start]scikit-learn to verify our PCA implementation, k-NN classification, and for data preprocessing[cite: 39].
+* [cite_start]PyTorch to implement our linear autoencoder and gradient descent optimization[cite: 40].
+
+[cite_start]Expected Results: Based on the theoretical results presented by Baldi & Hornik (1989), we expect the linear autoencoders (if properly trained) converge to span approximately the same subspace that we arrive at via PCA[cite: 41]. [cite_start]In addition, the weights of the autoencoder should be linear combinations of the principal components in the PCA[cite: 42]. [cite_start]We further expect both methods to achieve similar reconstruction error when using the same number of components[cite: 43]. [cite_start]We further expect PCA to be faster for one-time dimensionality reduction and for the autoencoder to have higher upfront computational costs due to its iterative nature in training[cite: 44]. [cite_start]However, once trained, the NN should have a comparable inference speed[cite: 45]. [cite_start]We expect the two systems to perform similarly on the classification task[cite: 46]. [cite_start]We further expect that certain hyperparameter conditions might be necessary for subspace convergence[cite: 47].
+
+4. [cite_start]Data and Resources [cite: 48]
+[cite_start]Data: Our primary data source will be the MNIST dataset of handwritten digits[cite: 49]. [cite_start]This dataset consists of 70,000 grayscale images of 10 classes of handwritten digits (0-9)[cite: 50]. [cite_start]60k are intended for training and 10k for testing[cite: 50, 53]. [cite_start]Each image is 28x28 pixels, resulting in 784 features per image[cite: 53].
+
+References:
+[cite_start]Theory: PCA, DL, Autoencoders [cite: 55]
+1. [cite_start]Neural Networks and Principal Component Analysis: Learning from Examples Without Local Minima [cite: 56]
+2. [cite_start]A Tutorial on Principal Component Analysis [cite: 57]
+3. [cite_start]Reducing the dimensionality of data with neural networks [cite: 58]
+4. [cite_start]Deep Learning (MIT Press) [cite: 59]
+5. [cite_start]From Principal Subspaces to Principal Components with Linear Autoencoders [cite: 60]
+6. [cite_start]Finding structure with randomness: Probabilistic algorithms for constructing approximate matrix decompositions [cite: 61, 62]
+7. Course Materials! [cite_start]Class Notes and our LA Textbook [cite: 63]
+[cite_start]Implementation: [cite: 64]
+1. [cite_start]Implementing an Autoencoder in PyTorch [cite: 65]
+2. [cite_start]PyTorch Documentation [cite: 66]
+3. [cite_start]Implementing PCA in Python with scikit-learn [cite: 67]
+4. [cite_start]Decomposing Signals in components (matrix factorization) [cite: 68]
+5. [cite_start]NumPy Documentation [cite: 69]
+
+5. [cite_start]Project Plan and Timeline [cite: 70]
+Stage 1: 1-2 days. [cite_start]Load MNIST (70,000 images), flatten images into vectors, split into training and test sets[cite: 71].
+Stage 2: 3-4 days. [cite_start]Compute the covariance matrix using NumPy, perform eigendecomposition, sort eigenvalues/eigenvectors, project data onto top-k components, reconstruct images and compute reconstruction error, verify results with sklearn's PCA to double-check correctness[cite: 71].
+Stage 3: 2-3 days. [cite_start]Construct a $784\rightarrow k\rightarrow784$ fully connected linear model (one encoder layer, one decoder layer), use MSE loss for reconstruction[cite: 71].
+Stage 4: 5-7 days. [cite_start]Train using gradient descent, log training curves, test different hyperparameters[cite: 71].
+Stage 5: 4-5 days. [cite_start]Compare reconstruction error, visualize reconstructed digits, compare learned encoder weights to PCA directions, visualize latent spaces, evaluate computational cost[cite: 71].
+Stage 6: 3-4 days. [cite_start]Use PCA-reduced data and AE-reduced data as inputs to a classifier, compare results[cite: 73].
+Stage 7: 4-6 days. [cite_start]Summarize findings, visualize key plots, discuss similarities and differences between the two methods, highlight any trends[cite: 73].
+
+6. [cite_start]Anticipated Challenges and Solutions [cite: 74]
+[cite_start]A. PCA Implementation [cite: 75]
+[cite_start]Challenge: Numerical PCA can lead to issues such as inconsistent eigenvector ordering, sign flips, or instability when comparing subspaces[cite: 76].
+[cite_start]Solution: Validate results with scikit-learn and compare subspaces using principal angles or projection matrices instead of direct eigenvector matching[cite: 77].
+
+[cite_start]B. Linear Autoencoder Training [cite: 78]
+[cite_start]Challenge: Gradient descent may not reliably converge to the PCA subspace because training depends heavily on initialization, learning rate, and optimizer choice[cite: 79].
+[cite_start]Solution: Test multiple seeds and hyperparameters, track training curves, and evaluate convergence using subspace similarity metrics[cite: 80].
+
+[cite_start]C. Visualization and interpretation [cite: 81]
+[cite_start]Challenge: Reconstructed images may look similar but differ in ways that are hard to measure or interpret visually[cite: 82].
+[cite_start]Solution: Combine image inspection with quantitative measures such as mean squared error or structural similarity to assess reconstruction quality[cite: 83].
+
+[cite_start]D. Classification comparison [cite: 84]
+[cite_start]Challenge: Classifier performance may be affected by differences in preprocessing or model settings rather than actual differences between PCA and autoencoder features[cite: 85].
+[cite_start]Solution: Use a standardized pipeline with identical classifiers and repeated evaluations across multiple data splits[cite: 86].
+
+[cite_start]Team Members: [cite: 87]
+[cite_start]Roger Fortunato, rlf2157@columbia.edu; [cite: 88]
+[cite_start]Nick Meyer, njm2179@columbia.edu; [cite: 88]
+[cite_start]Ayo Adetayo, aa5886@columbia.edu; [cite: 89]
+[cite_start]Joshua Were, jow2112@columbia.edu; [cite: 89]
+[cite_start]Arjun Purohit, ap4670@columbia.edu. [cite: 89]
