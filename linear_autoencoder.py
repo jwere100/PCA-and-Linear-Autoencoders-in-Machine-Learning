@@ -26,7 +26,7 @@ class AutoEncoder(nn.Module):
     def forward(self, x : torch.Tensor) -> torch.Tensor:
         return self.decoder(self.encoder(x))
 
-model = AutoEncoder()
+
 
 """
 Import MNIST Dataset:
