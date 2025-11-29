@@ -2,7 +2,7 @@
 AutoEncoder Implementation via Pytorch
 @author Joshua Were jow2112@columbia.edu
 @author Nick Meyer njm2179@columbia.edu
-11/26/25
+11/28/25
 """
 
 import numpy as np
