@@ -4,12 +4,18 @@ and differences of the PCA and LAE representations: subspace simularity and
 reconstruction error. Additional tools to help visualize the experimental results.
 @author Nick Meyer njm2179@columbia.edu
 11/29/2025
+
+updated by Ayo Adetayo on 11/29/25
 """
 
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from typing import Tuple, List
+from typing import Tuple, List, Dict
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+
 from principal_component_analysis import PCA
 from linear_autoencoder import AutoEncoder
 
@@ -245,12 +251,101 @@ def plot_principal_angles(angles_degrees: np.ndarray, path: str = None) -> None:
         plt.savefig(path, dpi = 150, bbox_inches = 'tight')
     plt.show()
 
+def compare_classification_performance(
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_test: np.ndarray,
+        y_test: np.ndarray,
+        pca: PCA,
+        autoencoder: AutoEncoder,
+        device: torch.device,
+) -> Dict[str, float]:
+    """
+    Compares downstream classification performance using three feature spaces:
+      1) Raw pixel space (784 dimensions)
+      2) PCA latent space (k dimensions)
+      3) Autoencoder latent space (k dimensions)
+
+    A simple linear classifier (logistic regression) is trained on each feature
+    representation using the same train and test splits.
+
+    Args:
+        X_train (np.ndarray): Training images, shape (n_train, 784)
+        y_train (np.ndarray): Training labels, shape (n_train,)
+        X_test (np.ndarray): Test images, shape (n_test, 784)
+        y_test (np.ndarray): Test labels, shape (n_test,)
+        pca (PCA): Fitted PCA model
+        autoencoder (AutoEncoder): Trained autoencoder model
+        device (torch.device): Device for autoencoder encoding
+
+    Returns:
+        Dict[str, float]: Dictionary containing classification accuracies:
+            - "raw_accuracy"
+            - "pca_accuracy"
+            - "ae_accuracy"
+    """
+    # 1. Raw pixel features
+    clf_raw = LogisticRegression(max_iter=1000, n_jobs=-1)
+    clf_raw.fit(X_train, y_train)
+    y_pred_raw = clf_raw.predict(X_test)
+    acc_raw = accuracy_score(y_test, y_pred_raw)
+
+    # 2. PCA features
+    Z_train_pca = pca.transform(X_train)
+    Z_test_pca = pca.transform(X_test)
+
+    clf_pca = LogisticRegression(max_iter=1000, n_jobs=-1)
+    clf_pca.fit(Z_train_pca, y_train)
+    y_pred_pca = clf_pca.predict(Z_test_pca)
+    acc_pca = accuracy_score(y_test, y_pred_pca)
+
+    # 3. Autoencoder latent features
+    Z_train_ae = autoencoder.encode(X_train, device)
+    Z_test_ae = autoencoder.encode(X_test, device)
+
+    clf_ae = LogisticRegression(max_iter=1000, n_jobs=-1)
+    clf_ae.fit(Z_train_ae, y_train)
+    y_pred_ae = clf_ae.predict(Z_test_ae)
+    acc_ae = accuracy_score(y_test, y_pred_ae)
+
+    return {
+        "raw_accuracy": acc_raw,
+        "pca_accuracy": acc_pca,
+        "ae_accuracy": acc_ae,
+    }
+
+def summarize_efficiency(
+        pca_fit_time: float,
+        pca_transform_time: float,
+        ae_train_time: float,
+        ae_encode_time: float | None = None,
+) -> None:
+    """
+    Prints a small summary of computational efficiency for PCA and the autoencoder.
+
+    Args:
+        pca_fit_time (float): Time spent fitting PCA in seconds
+        pca_transform_time (float): Time spent transforming data with PCA in seconds
+        ae_train_time (float): Time spent training the autoencoder in seconds
+        ae_encode_time (float | None): Optional time spent encoding data with AE in seconds
+    """
+    print("\n--- Computational Efficiency ---")
+    print(f"PCA fit time:          {pca_fit_time:.3f} seconds")
+    print(f"PCA transform time:    {pca_transform_time:.3f} seconds")
+    print(f"AE training time:      {ae_train_time:.3f} seconds")
+    if ae_encode_time is not None:
+        print(f"AE encode time:        {ae_encode_time:.3f} seconds")
+
+
+
 # Summary report
 def generate_report(
         X: np.ndarray,
         pca: PCA,
         autoencoder: AutoEncoder,
-        epoch_losses: List[float]
+        epoch_losses: List[float],
+        classification_results: Dict[str, float] | None = None,
+        efficiency_stats: Dict[str, float] | None = None,
 ) -> None:
     """
     Generates a comprehensive comparison report.
@@ -285,3 +380,23 @@ def generate_report(
     print(f"Total Epochs:   {len(epoch_losses)}")
     
     print("\n" + "=" * 60)
+
+    # Classification performance
+    if classification_results is not None:
+        print(f"\n--- Downstream Classification (Accuracy) ---")
+        print(f"Raw pixels accuracy:       {classification_results['raw_accuracy']:.4f}")
+        print(f"PCA features accuracy:     {classification_results['pca_accuracy']:.4f}")
+        print(f"AE features accuracy:      {classification_results['ae_accuracy']:.4f}")
+    
+    # Computational efficiency 
+    if efficiency_stats is not None:
+        print(f"\n--- Computational Efficiency ---")
+        if "pca_fit_time" in efficiency_stats:
+            print(f"PCA fit time:              {efficiency_stats['pca_fit_time']:.3f} seconds")
+        if "pca_transform_time" in efficiency_stats:
+            print(f"PCA transform time:        {efficiency_stats['pca_transform_time']:.3f} seconds")
+        if "ae_train_time" in efficiency_stats:
+            print(f"Autoencoder training time: {efficiency_stats['ae_train_time']:.3f} seconds")
+        if "ae_encode_time" in efficiency_stats:
+            print(f"Autoencoder encode time:   {efficiency_stats['ae_encode_time']:.3f} seconds")
+
