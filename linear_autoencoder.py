@@ -3,6 +3,8 @@ AutoEncoder Implementation via Pytorch
 @author Joshua Were jow2112@columbia.edu
 @author Nick Meyer njm2179@columbia.edu
 11/28/25
+
+Modified by Ayo Adetayo on 11/29/25
 """
 
 import numpy as np
@@ -12,6 +14,18 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from typing import Tuple
+import time
+import random
+
+def set_seed(seed: int = 0) -> None:
+    """
+    Sets seeds for Python, NumPy, and PyTorch to make experiments reproducible.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 class AutoEncoder(nn.Module):
     """
@@ -108,12 +122,30 @@ class AutoEncoder(nn.Module):
             X_reconstructed = self.forward(X_tensor)
             mse = torch.mean((X_tensor - X_reconstructed) ** 2).item()
         return mse
+    
+    def encode(self, X: np.ndarray, device: torch.device) -> np.ndarray:
+        """
+        Encodes NumPy data into the k dimensional latent space.
+
+        Args:
+            X (np.ndarray): Input data of shape (num_samples, 784)
+            device (torch.device): Device to perform computations on
+
+        Returns:
+            np.ndarray: Latent codes of shape (num_samples, k)
+        """
+        self.eval()
+        with torch.no_grad():
+            X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
+            Z = self.encoder(X_tensor)
+        return Z.cpu().numpy()
 
 def train_autoencoder(
         k: int = 50,                    
         batch_size: int = 64,           
         epochs: int = 30,               
-        learning_rate: float = 0.001,   
+        learning_rate: float = 0.001,
+        seed: int = 0,   
 ) -> Tuple[AutoEncoder, list, list]:
     """
     Trains a linear autoencoder on MNIST.
@@ -123,11 +155,13 @@ def train_autoencoder(
         batch_size (int): Training batch size
         epochs (int): Number of training epochs
         learning_rate (float): Optimizer learning rate
+        seed (int): Random seed for reproducibility
     
     Returns:
         model (Autoencoder): Trained autoencoder model
         epoch_losses (list): average loss per epoch
         outputs (list): Stored tuples for visualization (epoch, input, reconstruction)
+        total_train_time (float): Total training time in seconds
     """
 
     # Set device
@@ -136,6 +170,12 @@ def train_autoencoder(
     print(f"Using device: {device}")
     print(f"Model architecture: 784 → {k} → 784")
     print(f"Hyperparameters: batch_size={batch_size}, epochs={epochs}, lr={learning_rate}")
+
+    # Set random seeds for reproducibility
+    set_seed(seed)
+
+    # Measure total training time
+    train_start = time.time()
 
     # Import MNIST
     train_data = datasets.MNIST(root='dataset/',train=True,transform=transforms.ToTensor(),download=True)
@@ -190,11 +230,14 @@ def train_autoencoder(
         epoch_losses.append(avg_loss)
         print(f"Epoch {epoch+1}/{epochs}, Average Loss: {avg_loss:.6f}")
 
+    total_train_time = time.time() - train_start
+
     print(f"\nTraining complete!")
     print(f"Final loss: {epoch_losses[-1]:.6f}")
     print(f"Stored {len(outputs)} batches for visualization")
+    print(f"Total training time: {total_train_time:.2f} seconds")
 
-    return model, epoch_losses, outputs
+    return model, epoch_losses, outputs, total_train_time
 
 def save_model(model: AutoEncoder, filepath: str) -> None:
     """
