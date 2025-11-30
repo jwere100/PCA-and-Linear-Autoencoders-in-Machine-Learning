@@ -1,6 +1,8 @@
 """
 Principal Component Analysis (PCA) Implementation
 @author: Roger Fortunato 
+@author: Ayo Adetayo aa5886@columbia.edu
+@date: 11/29/25
 
 This module implements PCA for dimensionality reduction on the MNIST dataset.
 PCA finds the directions of maximum variance in the data and projects the data
@@ -84,6 +86,19 @@ class PCA:
         self.explained_variance_ratio_ = self.explained_variance_ / total_variance
         
         return self
+    
+    def encode(self, X: np.ndarray) -> np.ndarray:
+        """
+        Encodes data into the PCA latent space.
+        This is an alias for transform, provided for symmetry with the autoencoder API.
+
+        Args:
+            X (np.ndarray): Data to encode, shape (n_samples, n_features)
+
+        Returns:
+            np.ndarray: Latent representation of shape (n_samples, n_components)
+        """
+        return self.transform(X)
     
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
