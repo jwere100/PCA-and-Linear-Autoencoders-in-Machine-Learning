@@ -11,3 +11,4 @@ tzdata==2025.2
 torch==2.4.0
 torchvision==0.19.0
 matplotlib==3.9.0
+psutil==6.1.0
