@@ -159,14 +159,16 @@ def run_autoencoder_experiment(
     print(f"Hyperparameters: {hyperparams}")
     print(f"{'='*60}")
 
-    # Train autoencoder
+    # Train autoencoder with Baldi & Hornik (1989) conditions
     model, epoch_losses, outputs, train_time = train_autoencoder(
         X_train=X_train,
         k=k,
         batch_size=hyperparams['batch_size'],
         epochs=hyperparams['epochs'],
         learning_rate=hyperparams['learning_rate'],
-        seed=hyperparams['seed']
+        seed=hyperparams['seed'],
+        use_bias=False,  # No bias terms (Baldi & Hornik condition)
+        tied_weights=True  # Decoder = encoder.T (Baldi & Hornik condition)
     )
 
     # Compute reconstruction error on test set
