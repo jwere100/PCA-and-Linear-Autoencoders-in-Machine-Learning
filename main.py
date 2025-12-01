@@ -44,6 +44,16 @@ import matplotlib.pyplot as plt
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 
+# EXPERIMENT MODE CONFIGURATION
+
+# Set which experiments to run:
+# 1 = Main k-value comparison (baseline)
+# 2 = Initial hyperparameter sensitivity analysis
+# 3 = Optimization search (epochs, init, lr_schedule across all k values)
+# 4 = Constraint isolation (tied/untied weights, bias/no bias combinations)
+# 'all' = Run all experiments sequentially
+EXPERIMENT_MODE = 3  # Change this to run different experiments
+
 # Experiment configuration
 K_VALUES = [8, 32, 64, 128]  # Different latent dimensions to test
 
@@ -60,6 +70,41 @@ HYPERPARAM_GRID = {
     'learning_rates': [0.0001, 0.001, 0.01],
     'batch_sizes': [64, 128, 256],
     'seeds': [0, 42, 123],  # Different initializations
+}
+
+# Experiment 3: Optimization search configuration (full 70k dataset)
+# Tests different training configurations to find optimal convergence to PCA subspace
+OPTIMIZATION_CONFIG = {
+    'k_values': [8, 32, 64, 128],
+    'epochs': [50, 100, 200],
+    'init_strategies': ['default', 'orthogonal'],
+    'lr_schedules': ['constant', 'cosine'],
+    'base_lr': 0.001,
+    'batch_size': 128,
+    'seed': RANDOM_SEED,
+    'use_bias': False,
+    'tied_weights': True,
+    'max_samples': None,  # Use full 70k dataset
+}
+
+# Experiment 4: Constraint isolation configuration
+# Tests which constraint (tied weights vs no bias) is more critical
+CONSTRAINT_CONFIG = {
+    'k_values': [8, 32, 64, 128],
+    'configurations': [
+        {'use_bias': False, 'tied_weights': True, 'name': 'no_bias_tied'},
+        {'use_bias': False, 'tied_weights': False, 'name': 'no_bias_untied'},
+        {'use_bias': True, 'tied_weights': True, 'name': 'bias_tied'},
+        {'use_bias': True, 'tied_weights': False, 'name': 'bias_untied'},
+    ],
+    # Use optimal configuration from experiment 3 for experiment 4
+    'epochs': 100,
+    'init_strategy': 'orthogonal',
+    'lr_schedule': 'cosine',
+    'base_lr': 0.001,
+    'batch_size': 128,
+    'seed': RANDOM_SEED,
+    'max_samples': None,  # Use full 70k dataset
 }
 
 
@@ -139,7 +184,11 @@ def run_autoencoder_experiment(
     X_test: np.ndarray,
     k: int,
     hyperparams: Dict,
-    save_prefix: str = ""
+    save_prefix: str = "",
+    use_bias: bool = False,
+    tied_weights: bool = True,
+    init_strategy: str = 'default',
+    lr_schedule: str = 'constant'
 ) -> Tuple[AutoEncoder, List[float], Dict]:
     """
     Run autoencoder experiment with given hyperparameters.
@@ -150,6 +199,10 @@ def run_autoencoder_experiment(
         k: Bottleneck dimensionality
         hyperparams: Dictionary of hyperparameters
         save_prefix: Prefix for saved files (for hyperparameter experiments)
+        use_bias: Whether to use bias terms (default: False for Baldi & Hornik)
+        tied_weights: Whether decoder = encoder.T (default: True for Baldi & Hornik)
+        init_strategy: Weight initialization strategy ('default' or 'orthogonal')
+        lr_schedule: Learning rate schedule ('constant' or 'cosine')
 
     Returns:
         Trained model, training losses, and timing statistics
@@ -157,18 +210,22 @@ def run_autoencoder_experiment(
     print(f"\n{'='*60}")
     print(f"Training Autoencoder with k={k}")
     print(f"Hyperparameters: {hyperparams}")
+    print(f"Architecture: use_bias={use_bias}, tied_weights={tied_weights}")
+    print(f"Training: init={init_strategy}, lr_schedule={lr_schedule}")
     print(f"{'='*60}")
 
-    # Train autoencoder with Baldi & Hornik (1989) conditions
-    model, epoch_losses, outputs, train_time = train_autoencoder(
+    # Train autoencoder with configurable architecture and training settings
+    model, epoch_losses, outputs, train_time, peak_memory = train_autoencoder(
         X_train=X_train,
         k=k,
         batch_size=hyperparams['batch_size'],
         epochs=hyperparams['epochs'],
         learning_rate=hyperparams['learning_rate'],
         seed=hyperparams['seed'],
-        use_bias=False,  # No bias terms (Baldi & Hornik condition)
-        tied_weights=True  # Decoder = encoder.T (Baldi & Hornik condition)
+        use_bias=use_bias,
+        tied_weights=tied_weights,
+        init_strategy=init_strategy,
+        lr_schedule=lr_schedule
     )
 
     # Compute reconstruction error on test set
@@ -596,30 +653,434 @@ def create_hyperparameter_plots(results: List[Dict]):
     print(f"  Saved hyperparameter sensitivity plot to {viz_path}")
 
 
+def run_optimization_experiments(X_train: np.ndarray, X_test: np.ndarray,
+                                 y_train: np.ndarray, y_test: np.ndarray):
+    """
+    Experiment 3: Optimization search to find best configuration for PCA convergence.
+    Tests different combinations of epochs, initialization, and learning rate schedules
+    on full 70k dataset across various values of k.
+
+    Total runs: 4 k values × 3 epochs × 2 init × 2 lr_schedule = 48 runs
+    """
+    print("\n\n" + "="*80)
+    print("EXPERIMENT 3: OPTIMIZATION SEARCH FOR PCA CONVERGENCE")
+    print("="*80)
+    print(f"Configuration: {OPTIMIZATION_CONFIG}")
+    print(f"Total runs: {len(OPTIMIZATION_CONFIG['k_values']) * len(OPTIMIZATION_CONFIG['epochs']) * len(OPTIMIZATION_CONFIG['init_strategies']) * len(OPTIMIZATION_CONFIG['lr_schedules'])}")
+
+    # Fit PCA models for all k values once
+    print("\n" + "="*60)
+    print("Fitting PCA models for all k values...")
+    print("="*60)
+    pca_models = {}
+    for k in OPTIMIZATION_CONFIG['k_values']:
+        pca, _ = run_pca_experiment(X_train, X_test, k)
+        pca_models[k] = pca
+
+    all_results = []
+    run_id = 0
+
+    # Grid search over all configurations
+    for k in OPTIMIZATION_CONFIG['k_values']:
+        for epochs in OPTIMIZATION_CONFIG['epochs']:
+            for init_strategy in OPTIMIZATION_CONFIG['init_strategies']:
+                for lr_schedule in OPTIMIZATION_CONFIG['lr_schedules']:
+                    run_id += 1
+                    print(f"\n{'#'*70}")
+                    print(f"# RUN {run_id}/48: k={k}, epochs={epochs}, init={init_strategy}, lr_schedule={lr_schedule}")
+                    print(f"{'#'*70}")
+
+                    # Create hyperparams dict
+                    hyperparams = {
+                        'batch_size': OPTIMIZATION_CONFIG['batch_size'],
+                        'epochs': epochs,
+                        'learning_rate': OPTIMIZATION_CONFIG['base_lr'],
+                        'seed': OPTIMIZATION_CONFIG['seed']
+                    }
+
+                    # Train autoencoder
+                    save_prefix = f"opt_k{k}_ep{epochs}_{init_strategy}_{lr_schedule}_"
+                    autoencoder, epoch_losses, ae_stats = run_autoencoder_experiment(
+                        X_train, X_test, k, hyperparams,
+                        save_prefix=save_prefix,
+                        use_bias=OPTIMIZATION_CONFIG['use_bias'],
+                        tied_weights=OPTIMIZATION_CONFIG['tied_weights'],
+                        init_strategy=init_strategy,
+                        lr_schedule=lr_schedule
+                    )
+
+                    # Compute subspace similarity with PCA
+                    pca = pca_models[k]
+                    similarity = compute_subspace_similarity(pca, autoencoder)
+
+                    # Compute reconstruction error comparison
+                    recon_comparison = compare_reconstruction_error(X_test, pca, autoencoder)
+
+                    # Compile results
+                    result = {
+                        'run_id': run_id,
+                        'k': k,
+                        'epochs': epochs,
+                        'init_strategy': init_strategy,
+                        'lr_schedule': lr_schedule,
+                        'batch_size': hyperparams['batch_size'],
+                        'learning_rate': hyperparams['learning_rate'],
+                        'mean_angle_degrees': similarity['mean_angle_degrees'],
+                        'grassmann_distance': similarity['grassmann_distance'],
+                        'max_angle_degrees': similarity['principal_angles_deg'].max(),
+                        'min_angle_degrees': similarity['principal_angles_deg'].min(),
+                        'pca_mse': recon_comparison['pca_mse'],
+                        'ae_mse': recon_comparison['lae_mse'],
+                        'mse_ratio': recon_comparison['ratio'],
+                        'ae_final_loss': ae_stats['ae_final_loss'],
+                        'ae_train_time': ae_stats['ae_train_time'],
+                        'ae_reconstruction_error': ae_stats['ae_reconstruction_error']
+                    }
+                    all_results.append(result)
+
+                    print(f"  Mean angle: {similarity['mean_angle_degrees']:.4f}°")
+                    print(f"  Grassmann distance: {similarity['grassmann_distance']:.6f}")
+                    print(f"  AE MSE: {recon_comparison['lae_mse']:.6f}")
+                    print(f"  Training time: {ae_stats['ae_train_time']:.2f}s")
+
+    # Save results
+    save_metrics_to_csv(all_results, 'optimization_experiments.csv')
+
+    # Create analysis plots
+    create_optimization_plots(all_results)
+
+    # Print best configurations
+    print("\n" + "="*80)
+    print("BEST CONFIGURATIONS BY K VALUE:")
+    print("="*80)
+    df = pd.DataFrame(all_results)
+    for k in OPTIMIZATION_CONFIG['k_values']:
+        k_results = df[df['k'] == k]
+        best = k_results.loc[k_results['mean_angle_degrees'].idxmin()]
+        print(f"\nk={k}:")
+        print(f"  Best config: epochs={best['epochs']}, init={best['init_strategy']}, lr_schedule={best['lr_schedule']}")
+        print(f"  Mean angle: {best['mean_angle_degrees']:.4f}°")
+        print(f"  Grassmann distance: {best['grassmann_distance']:.6f}")
+        print(f"  Training time: {best['ae_train_time']:.2f}s")
+
+    return all_results
+
+
+def create_optimization_plots(results: List[Dict]):
+    """Create visualization plots for optimization experiment results."""
+    print("\nCreating optimization experiment plots...")
+
+    df = pd.DataFrame(results)
+
+    # Create a comprehensive figure with multiple subplots
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+
+    # Plot 1: Mean angle by configuration for each k
+    ax = axes[0, 0]
+    for k in OPTIMIZATION_CONFIG['k_values']:
+        k_data = df[df['k'] == k]
+        # Create x-axis labels combining all config parameters
+        k_data['config'] = k_data['epochs'].astype(str) + '_' + k_data['init_strategy'] + '_' + k_data['lr_schedule']
+        ax.plot(range(len(k_data)), k_data['mean_angle_degrees'], marker='o', label=f'k={k}', linewidth=2)
+    ax.set_xlabel('Configuration Index')
+    ax.set_ylabel('Mean Principal Angle (degrees)')
+    ax.set_title('Mean Principal Angle by Configuration')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    # Plot 2: Effect of epochs
+    ax = axes[0, 1]
+    for k in OPTIMIZATION_CONFIG['k_values']:
+        k_data = df[df['k'] == k]
+        # Average over init and lr_schedule
+        grouped = k_data.groupby('epochs')['mean_angle_degrees'].mean()
+        ax.plot(grouped.index, grouped.values, marker='o', label=f'k={k}', linewidth=2)
+    ax.set_xlabel('Epochs')
+    ax.set_ylabel('Mean Principal Angle (degrees)')
+    ax.set_title('Effect of Training Epochs (averaged over init & lr_schedule)')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    # Plot 3: Effect of initialization strategy
+    ax = axes[1, 0]
+    init_comparison = df.groupby(['k', 'init_strategy'])['mean_angle_degrees'].mean().unstack()
+    x = np.arange(len(OPTIMIZATION_CONFIG['k_values']))
+    width = 0.35
+    ax.bar(x - width/2, init_comparison['default'], width, label='Default init', alpha=0.8)
+    ax.bar(x + width/2, init_comparison['orthogonal'], width, label='Orthogonal init', alpha=0.8)
+    ax.set_xlabel('k value')
+    ax.set_ylabel('Mean Principal Angle (degrees)')
+    ax.set_title('Effect of Initialization Strategy (averaged over epochs & lr_schedule)')
+    ax.set_xticks(x)
+    ax.set_xticklabels(OPTIMIZATION_CONFIG['k_values'])
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis='y')
+
+    # Plot 4: Effect of learning rate schedule
+    ax = axes[1, 1]
+    lr_comparison = df.groupby(['k', 'lr_schedule'])['mean_angle_degrees'].mean().unstack()
+    x = np.arange(len(OPTIMIZATION_CONFIG['k_values']))
+    width = 0.35
+    ax.bar(x - width/2, lr_comparison['constant'], width, label='Constant LR', alpha=0.8)
+    ax.bar(x + width/2, lr_comparison['cosine'], width, label='Cosine annealing', alpha=0.8)
+    ax.set_xlabel('k value')
+    ax.set_ylabel('Mean Principal Angle (degrees)')
+    ax.set_title('Effect of Learning Rate Schedule (averaged over epochs & init)')
+    ax.set_xticks(x)
+    ax.set_xticklabels(OPTIMIZATION_CONFIG['k_values'])
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    viz_path = 'results/visualizations/optimization_experiments.png'
+    plt.savefig(viz_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"  Saved optimization experiments plot to {viz_path}")
+
+
+def run_constraint_experiments(X_train: np.ndarray, X_test: np.ndarray,
+                               y_train: np.ndarray, y_test: np.ndarray):
+    """
+    Experiment 4: Constraint isolation to determine which constraint is more critical.
+    Tests all 4 combinations of (tied/untied) × (bias/no_bias) across all k values.
+
+    Total runs: 4 k values × 4 configurations = 16 runs
+    """
+    print("\n\n" + "="*80)
+    print("EXPERIMENT 4: CONSTRAINT ISOLATION")
+    print("="*80)
+    print(f"Configuration: {CONSTRAINT_CONFIG}")
+    print(f"Total runs: {len(CONSTRAINT_CONFIG['k_values']) * len(CONSTRAINT_CONFIG['configurations'])}")
+
+    # Fit PCA models for all k values once
+    print("\n" + "="*60)
+    print("Fitting PCA models for all k values...")
+    print("="*60)
+    pca_models = {}
+    for k in CONSTRAINT_CONFIG['k_values']:
+        pca, _ = run_pca_experiment(X_train, X_test, k)
+        pca_models[k] = pca
+
+    all_results = []
+    run_id = 0
+
+    # Test all configurations
+    for k in CONSTRAINT_CONFIG['k_values']:
+        for config in CONSTRAINT_CONFIG['configurations']:
+            run_id += 1
+            print(f"\n{'#'*70}")
+            print(f"# RUN {run_id}/16: k={k}, config={config['name']}")
+            print(f"# use_bias={config['use_bias']}, tied_weights={config['tied_weights']}")
+            print(f"{'#'*70}")
+
+            # Create hyperparams dict
+            hyperparams = {
+                'batch_size': CONSTRAINT_CONFIG['batch_size'],
+                'epochs': CONSTRAINT_CONFIG['epochs'],
+                'learning_rate': CONSTRAINT_CONFIG['base_lr'],
+                'seed': CONSTRAINT_CONFIG['seed']
+            }
+
+            # Train autoencoder
+            save_prefix = f"constraint_k{k}_{config['name']}_"
+            autoencoder, epoch_losses, ae_stats = run_autoencoder_experiment(
+                X_train, X_test, k, hyperparams,
+                save_prefix=save_prefix,
+                use_bias=config['use_bias'],
+                tied_weights=config['tied_weights'],
+                init_strategy=CONSTRAINT_CONFIG['init_strategy'],
+                lr_schedule=CONSTRAINT_CONFIG['lr_schedule']
+            )
+
+            # Compute subspace similarity with PCA
+            pca = pca_models[k]
+            similarity = compute_subspace_similarity(pca, autoencoder)
+
+            # Compute reconstruction error comparison
+            recon_comparison = compare_reconstruction_error(X_test, pca, autoencoder)
+
+            # Classification performance
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            classification_results = compare_classification_performance(
+                X_train, y_train, X_test, y_test, pca, autoencoder, device
+            )
+
+            # Compile results
+            result = {
+                'run_id': run_id,
+                'k': k,
+                'configuration': config['name'],
+                'use_bias': config['use_bias'],
+                'tied_weights': config['tied_weights'],
+                'epochs': hyperparams['epochs'],
+                'init_strategy': CONSTRAINT_CONFIG['init_strategy'],
+                'lr_schedule': CONSTRAINT_CONFIG['lr_schedule'],
+                'mean_angle_degrees': similarity['mean_angle_degrees'],
+                'grassmann_distance': similarity['grassmann_distance'],
+                'max_angle_degrees': similarity['principal_angles_deg'].max(),
+                'min_angle_degrees': similarity['principal_angles_deg'].min(),
+                'pca_mse': recon_comparison['pca_mse'],
+                'ae_mse': recon_comparison['lae_mse'],
+                'mse_ratio': recon_comparison['ratio'],
+                'pca_accuracy': classification_results['pca_accuracy'],
+                'ae_accuracy': classification_results['ae_accuracy'],
+                'ae_final_loss': ae_stats['ae_final_loss'],
+                'ae_train_time': ae_stats['ae_train_time']
+            }
+            all_results.append(result)
+
+            print(f"  Mean angle: {similarity['mean_angle_degrees']:.4f}°")
+            print(f"  Grassmann distance: {similarity['grassmann_distance']:.6f}")
+            print(f"  AE accuracy: {classification_results['ae_accuracy']:.4f}")
+
+    # Save results
+    save_metrics_to_csv(all_results, 'constraint_experiments.csv')
+
+    # Create analysis plots
+    create_constraint_plots(all_results)
+
+    # Print summary analysis
+    print("\n" + "="*80)
+    print("CONSTRAINT ISOLATION SUMMARY:")
+    print("="*80)
+    df = pd.DataFrame(all_results)
+
+    # Average across all k values
+    print("\nAverage across all k values:")
+    for config in CONSTRAINT_CONFIG['configurations']:
+        config_results = df[df['configuration'] == config['name']]
+        avg_angle = config_results['mean_angle_degrees'].mean()
+        avg_grassmann = config_results['grassmann_distance'].mean()
+        print(f"\n{config['name']}:")
+        print(f"  use_bias={config['use_bias']}, tied_weights={config['tied_weights']}")
+        print(f"  Avg mean angle: {avg_angle:.4f}°")
+        print(f"  Avg Grassmann distance: {avg_grassmann:.6f}")
+
+    # Best configuration
+    best = df.loc[df['mean_angle_degrees'].idxmin()]
+    print(f"\nBest overall configuration:")
+    print(f"  {best['configuration']} (k={best['k']})")
+    print(f"  Mean angle: {best['mean_angle_degrees']:.4f}°")
+    print(f"  Grassmann distance: {best['grassmann_distance']:.6f}")
+
+    return all_results
+
+
+def create_constraint_plots(results: List[Dict]):
+    """Create visualization plots for constraint experiment results."""
+    print("\nCreating constraint experiment plots...")
+
+    df = pd.DataFrame(results)
+
+    # Create a comprehensive figure
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+
+    # Plot 1: Mean angle by configuration for each k
+    ax = axes[0, 0]
+    configs = df['configuration'].unique()
+    x = np.arange(len(CONSTRAINT_CONFIG['k_values']))
+    width = 0.2
+    for i, config in enumerate(configs):
+        config_data = df[df['configuration'] == config]
+        config_data = config_data.sort_values('k')
+        offset = (i - len(configs)/2 + 0.5) * width
+        ax.bar(x + offset, config_data['mean_angle_degrees'], width, label=config, alpha=0.8)
+    ax.set_xlabel('k value')
+    ax.set_ylabel('Mean Principal Angle (degrees)')
+    ax.set_title('Mean Principal Angle by Configuration')
+    ax.set_xticks(x)
+    ax.set_xticklabels(CONSTRAINT_CONFIG['k_values'])
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis='y')
+
+    # Plot 2: Grassmann distance by configuration
+    ax = axes[0, 1]
+    for i, config in enumerate(configs):
+        config_data = df[df['configuration'] == config]
+        config_data = config_data.sort_values('k')
+        offset = (i - len(configs)/2 + 0.5) * width
+        ax.bar(x + offset, config_data['grassmann_distance'], width, label=config, alpha=0.8)
+    ax.set_xlabel('k value')
+    ax.set_ylabel('Grassmann Distance')
+    ax.set_title('Grassmann Distance by Configuration')
+    ax.set_xticks(x)
+    ax.set_xticklabels(CONSTRAINT_CONFIG['k_values'])
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis='y')
+
+    # Plot 3: Effect of tied weights (averaged over bias setting)
+    ax = axes[1, 0]
+    tied_comparison = df.groupby(['k', 'tied_weights'])['mean_angle_degrees'].mean().unstack()
+    x = np.arange(len(CONSTRAINT_CONFIG['k_values']))
+    width = 0.35
+    ax.bar(x - width/2, tied_comparison[False], width, label='Untied weights', alpha=0.8)
+    ax.bar(x + width/2, tied_comparison[True], width, label='Tied weights', alpha=0.8)
+    ax.set_xlabel('k value')
+    ax.set_ylabel('Mean Principal Angle (degrees)')
+    ax.set_title('Effect of Tied Weights (averaged over bias setting)')
+    ax.set_xticks(x)
+    ax.set_xticklabels(CONSTRAINT_CONFIG['k_values'])
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis='y')
+
+    # Plot 4: Effect of bias (averaged over tied weights setting)
+    ax = axes[1, 1]
+    bias_comparison = df.groupby(['k', 'use_bias'])['mean_angle_degrees'].mean().unstack()
+    x = np.arange(len(CONSTRAINT_CONFIG['k_values']))
+    width = 0.35
+    ax.bar(x - width/2, bias_comparison[False], width, label='No bias', alpha=0.8)
+    ax.bar(x + width/2, bias_comparison[True], width, label='With bias', alpha=0.8)
+    ax.set_xlabel('k value')
+    ax.set_ylabel('Mean Principal Angle (degrees)')
+    ax.set_title('Effect of Bias (averaged over tied weights setting)')
+    ax.set_xticks(x)
+    ax.set_xticklabels(CONSTRAINT_CONFIG['k_values'])
+    ax.legend()
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    viz_path = 'results/visualizations/constraint_experiments.png'
+    plt.savefig(viz_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"  Saved constraint experiments plot to {viz_path}")
+
+
 def main():
     """Main experiment execution."""
     print("\n" + "="*80)
     print(" "*20 + "PCA vs LINEAR AUTOENCODER EXPERIMENT")
     print("="*80)
-    print(f"\nRandom seed: {RANDOM_SEED}")
-    print(f"K values to test: {K_VALUES}")
-    print(f"Baseline hyperparameters: {BASELINE_HYPERPARAMS}")
-    print(f"Hyperparameter grid: {HYPERPARAM_GRID}")
+    print(f"\nExperiment Mode: {EXPERIMENT_MODE}")
+    print(f"Random seed: {RANDOM_SEED}")
 
     # Create results directories
     create_results_directories()
+
+    # Determine which dataset to load based on experiment mode
+    if EXPERIMENT_MODE == 3:
+        max_samples = OPTIMIZATION_CONFIG['max_samples']
+        dataset_desc = "full 70k dataset" if max_samples is None else f"{max_samples} samples"
+    elif EXPERIMENT_MODE == 4:
+        max_samples = CONSTRAINT_CONFIG['max_samples']
+        dataset_desc = "full 70k dataset" if max_samples is None else f"{max_samples} samples"
+    elif EXPERIMENT_MODE == 'all':
+        max_samples = None
+        dataset_desc = "full 70k dataset" if max_samples is None else f"{max_samples} samples"
+    else:
+        max_samples = 10000
+        dataset_desc = "10,000 samples"
 
     # Load data
     print("\n" + "="*60)
     print("LOADING DATA")
     print("="*60)
-    print("Loading MNIST dataset (10,000 samples for testing)...")
+    print(f"Loading MNIST dataset ({dataset_desc})...")
     load_start = time.time()
     X_train, X_test, y_train, y_test = load_mnist_split(
         test_size=0.2,
         random_state=RANDOM_SEED,
         normalize=True,
-        max_samples=10000  # Use 10k for testing; set to None for full dataset
+        max_samples=max_samples
     )
     load_time = time.time() - load_start
 
@@ -628,34 +1089,100 @@ def main():
     print(f"  Test set: {X_test.shape}")
     print(f"  Data range: [{X_train.min():.3f}, {X_train.max():.3f}]")
 
-    # Run main experiments
-    start_time = time.time()
-    main_metrics = run_main_experiments(X_train, X_test, y_train, y_test)
-    main_time = time.time() - start_time
+    # Run experiments based on mode
+    experiment_times = {}
 
-    # Run hyperparameter sensitivity experiments
-    hp_start = time.time()
-    hp_metrics = run_hyperparameter_experiments(X_train, X_test, y_train, y_test)
-    hp_time = time.time() - hp_start
+    if EXPERIMENT_MODE == 1 or EXPERIMENT_MODE == 'all':
+        print(f"\n{'='*80}")
+        print("Running Experiment 1: Main k-value comparison")
+        print(f"{'='*80}")
+        start_time = time.time()
+        main_metrics = run_main_experiments(X_train, X_test, y_train, y_test)
+        experiment_times['main_experiments'] = time.time() - start_time
+
+        # Print summary for Experiment 1
+        best_k = min(main_metrics, key=lambda x: x['mean_angle_degrees'])
+        print(f"\nBest k value: k={best_k['k']}")
+        print(f"  Mean principal angle: {best_k['mean_angle_degrees']:.2f}°")
+        print(f"  Grassmann distance: {best_k['grassmann_distance']:.4f}")
+
+    if EXPERIMENT_MODE == 2 or EXPERIMENT_MODE == 'all':
+        print(f"\n{'='*80}")
+        print("Running Experiment 2: Hyperparameter sensitivity analysis")
+        print(f"{'='*80}")
+        start_time = time.time()
+        hp_metrics = run_hyperparameter_experiments(X_train, X_test, y_train, y_test)
+        experiment_times['hyperparameter_experiments'] = time.time() - start_time
+
+        # Print summary for Experiment 2
+        hp_df = pd.DataFrame(hp_metrics)
+        best_hp = hp_df.loc[hp_df['mean_angle_degrees'].idxmin()]
+        print(f"\nBest hyperparameters:")
+        print(f"  Learning rate: {best_hp['learning_rate']}")
+        print(f"  Batch size: {best_hp['batch_size']}")
+        print(f"  Seed: {best_hp['seed']}")
+        print(f"  Mean principal angle: {best_hp['mean_angle_degrees']:.2f}°")
+
+    if EXPERIMENT_MODE == 3 or EXPERIMENT_MODE == 'all':
+        print(f"\n{'='*80}")
+        print("Running Experiment 3: Optimization search")
+        print(f"{'='*80}")
+        start_time = time.time()
+        opt_metrics = run_optimization_experiments(X_train, X_test, y_train, y_test)
+        experiment_times['optimization_experiments'] = time.time() - start_time
+
+        # Print summary for Experiment 3
+        opt_df = pd.DataFrame(opt_metrics)
+        best_opt = opt_df.loc[opt_df['mean_angle_degrees'].idxmin()]
+        print(f"\nBest optimization `config`uration:")
+        print(f"  k={best_opt['k']}, epochs={best_opt['epochs']}")
+        print(f"  init={best_opt['init_strategy']}, lr_schedule={best_opt['lr_schedule']}")
+        print(f"  Mean principal angle: {best_opt['mean_angle_degrees']:.4f}°")
+
+    if EXPERIMENT_MODE == 4 or EXPERIMENT_MODE == 'all':
+        print(f"\n{'='*80}")
+        print("Running Experiment 4: Constraint isolation")
+        print(f"{'='*80}")
+        start_time = time.time()
+        constraint_metrics = run_constraint_experiments(X_train, X_test, y_train, y_test)
+        experiment_times['constraint_experiments'] = time.time() - start_time
+
+        # Print summary for Experiment 4
+        const_df = pd.DataFrame(constraint_metrics)
+        best_const = const_df.loc[const_df['mean_angle_degrees'].idxmin()]
+        print(f"\nBest constraint configuration:")
+        print(f"  {best_const['configuration']} (k={best_const['k']})")
+        print(f"  Mean principal angle: {best_const['mean_angle_degrees']:.4f}°")
 
     # Save experiment configuration
+    total_experiment_time = sum(experiment_times.values())
     config = {
+        'experiment_mode': EXPERIMENT_MODE,
         'random_seed': RANDOM_SEED,
-        'k_values': K_VALUES,
-        'baseline_hyperparams': BASELINE_HYPERPARAMS,
-        'hyperparam_grid': HYPERPARAM_GRID,
         'dataset': {
             'train_size': len(X_train),
             'test_size': len(X_test),
-            'features': X_train.shape[1]
+            'features': X_train.shape[1],
+            'max_samples': max_samples
         },
         'timing': {
             'data_load_time': load_time,
-            'main_experiments_time': main_time,
-            'hyperparameter_experiments_time': hp_time,
-            'total_time': load_time + main_time + hp_time
+            **experiment_times,
+            'total_time': load_time + total_experiment_time
         }
     }
+
+    # Add mode-specific config
+    if EXPERIMENT_MODE == 1 or EXPERIMENT_MODE == 'all':
+        config['baseline_hyperparams'] = BASELINE_HYPERPARAMS
+        config['k_values'] = K_VALUES
+    if EXPERIMENT_MODE == 2 or EXPERIMENT_MODE == 'all':
+        config['hyperparam_grid'] = HYPERPARAM_GRID
+    if EXPERIMENT_MODE == 3 or EXPERIMENT_MODE == 'all':
+        config['optimization_config'] = OPTIMIZATION_CONFIG
+    if EXPERIMENT_MODE == 4 or EXPERIMENT_MODE == 'all':
+        config['constraint_config'] = {k: v for k, v in CONSTRAINT_CONFIG.items() if k != 'configurations'}
+        config['constraint_config']['num_configurations'] = len(CONSTRAINT_CONFIG['configurations'])
 
     with open('results/experiment_config.json', 'w') as f:
         json.dump(config, f, indent=2)
@@ -664,39 +1191,18 @@ def main():
     print("\n\n" + "="*80)
     print(" "*30 + "EXPERIMENT COMPLETE!")
     print("="*80)
-    print(f"\nTotal execution time: {config['timing']['total_time']:.2f}s "
+    print(f"\nExperiment Mode: {EXPERIMENT_MODE}")
+    print(f"Total execution time: {config['timing']['total_time']:.2f}s "
           f"({config['timing']['total_time']/60:.1f} minutes)")
     print(f"  Data loading: {load_time:.2f}s")
-    print(f"  Main experiments: {main_time:.2f}s")
-    print(f"  Hyperparameter experiments: {hp_time:.2f}s")
+    for exp_name, exp_time in experiment_times.items():
+        print(f"  {exp_name}: {exp_time:.2f}s ({exp_time/60:.1f} minutes)")
 
     print("\nResults saved to:")
     print("  - results/models/            (PCA and autoencoder models)")
     print("  - results/visualizations/    (All plots and figures)")
     print("  - results/metrics/           (CSV files with all metrics)")
     print("  - results/experiment_config.json  (Experiment configuration)")
-
-    print("\n" + "="*80)
-    print("Key Findings Summary:")
-    print("="*80)
-
-    # Print key insights from main experiments
-    best_k = min(main_metrics, key=lambda x: x['mean_angle_degrees'])
-    print(f"\nBest k value (lowest mean angle): k={best_k['k']}")
-    print(f"  Mean principal angle: {best_k['mean_angle_degrees']:.2f}°")
-    print(f"  Grassmann distance: {best_k['grassmann_distance']:.4f}")
-    print(f"  PCA MSE: {best_k['pca_mse']:.6f}")
-    print(f"  AE MSE: {best_k['lae_mse']:.6f}")
-    print(f"  MSE ratio (AE/PCA): {best_k['ratio']:.4f}")
-
-    # Print hyperparameter insights
-    hp_df = pd.DataFrame(hp_metrics)
-    best_hp = hp_df.loc[hp_df['mean_angle_degrees'].idxmin()]
-    print(f"\nBest hyperparameters (lowest mean angle):")
-    print(f"  Learning rate: {best_hp['learning_rate']}")
-    print(f"  Batch size: {best_hp['batch_size']}")
-    print(f"  Seed: {best_hp['seed']}")
-    print(f"  Mean principal angle: {best_hp['mean_angle_degrees']:.2f}°")
 
     print("\n" + "="*80)
     print("All results have been saved to the 'results/' directory.")
