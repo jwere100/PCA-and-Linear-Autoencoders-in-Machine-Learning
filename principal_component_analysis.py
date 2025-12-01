@@ -45,6 +45,7 @@ class PCA:
         self.explained_variance_ = None
         self.explained_variance_ratio_ = None
         
+
     def fit(self, X: np.ndarray) -> 'PCA':
         """
         Fit PCA on training data.
@@ -87,6 +88,7 @@ class PCA:
         
         return self
     
+
     def encode(self, X: np.ndarray) -> np.ndarray:
         """
         Encodes data into the PCA latent space.
@@ -100,6 +102,7 @@ class PCA:
         """
         return self.transform(X)
     
+
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
         Project data onto the principal components.
@@ -119,6 +122,7 @@ class PCA:
         X_centered = X - self.mean_
         return X_centered @ self.components_.T
     
+
     def fit_transform(self, X: np.ndarray) -> np.ndarray:
         """
         Fit PCA and transform data in one step.
@@ -131,6 +135,7 @@ class PCA:
         """
         return self.fit(X).transform(X)
     
+
     def inverse_transform(self, X_transformed: np.ndarray) -> np.ndarray:
         """
         Reconstruct data from principal component projections.
@@ -150,6 +155,7 @@ class PCA:
         X_reconstructed = X_transformed @ self.components_
         return X_reconstructed + self.mean_
     
+
     def get_reconstruction_error(self, X: np.ndarray) -> float:
         """
         Calculate the mean squared reconstruction error.
@@ -168,6 +174,7 @@ class PCA:
         mse = np.mean((X - X_reconstructed) ** 2)
         return mse
     
+
     def get_cumulative_variance_explained(self) -> np.ndarray:
         """
         Get cumulative explained variance ratio.
@@ -179,4 +186,3 @@ class PCA:
             raise ValueError("PCA must be fit first. Call fit() before this method.")
         
         return np.cumsum(self.explained_variance_ratio_)
-
