@@ -2,11 +2,14 @@
 Data Loader for MNIST Dataset
 @author: Ayo Adetayo aa5886@columbia.edu
 @date: 11/29/25
+
+Modified by Nick Meyer on 12/01/25
 """
 
 import numpy as np
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
+from typing import Optional, Tuple
 
 def load_mnist():
     """
@@ -25,11 +28,12 @@ def load_mnist():
 
     return X, y
 
+
 def load_mnist_split(
     test_size: float = 0.2,
     random_state: int = 0,
     normalize: bool = True,
-    max_samples: int | None = None,
+    max_samples: Optional[int] = None,
 ):
     """
     Loads MNIST and returns a reproducible train test split, with optional

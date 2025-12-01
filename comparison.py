@@ -2,16 +2,16 @@
 Implementation of a set of comparison functions to measure the similarities
 and differences of the PCA and LAE representations: subspace simularity and 
 reconstruction error. Additional tools to help visualize the experimental results.
-@author Nick Meyer njm2179@columbia.edu
-11/29/2025
+@author: Nick Meyer njm2179@columbia.edu
+@date: 11/29/2025
 
-updated by Ayo Adetayo on 11/29/25
+Updated by Ayo Adetayo on 11/29/25
 """
 
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Optional
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
@@ -50,6 +50,7 @@ def compute_principal_angles(A: np.ndarray, B: np.ndarray) -> np.ndarray:
 
     return principal_angles
 
+
 def subspace_distance(A: np.ndarray, B: np.ndarray) -> float:
     """
     Computes the Grassmann distance between the two subspaces using the
@@ -67,6 +68,7 @@ def subspace_distance(A: np.ndarray, B: np.ndarray) -> float:
     """
     principal_angles = compute_principal_angles(A, B)
     return np.sqrt(np.sum(principal_angles ** 2))
+
 
 def compute_subspace_similarity(pca: PCA, autoencoder: AutoEncoder) -> dict:
     """
@@ -95,6 +97,7 @@ def compute_subspace_similarity(pca: PCA, autoencoder: AutoEncoder) -> dict:
         'grassmann_distance': subspace_distance(pca_components, lae_weights),
         'mean_angle_degrees': np.mean(np.degrees(angles))
     }
+
 
 # Comparing reconstruction error
 def compare_reconstruction_error(
@@ -125,13 +128,14 @@ def compare_reconstruction_error(
         'ratio': lae_mse / pca_mse if pca_mse > 0 else float('inf')
     }
 
+
 # Visualization
 def plot_reconstruction_comparison(
-        X: np.ndarray, 
-        pca: PCA, 
-        autoencoder: AutoEncoder, 
-        num_images: int = 5, 
-        path: str = None
+        X: np.ndarray,
+        pca: PCA,
+        autoencoder: AutoEncoder,
+        num_images: int = 5,
+        path: Optional[str] = None
 ) -> None:
     """
     Plots the original images against PCA and LAE reconstructions.
@@ -183,11 +187,12 @@ def plot_reconstruction_comparison(
     
     plt.show()
 
+
 def plot_components_comparison(
-        pca: PCA, 
-        autoencoder: AutoEncoder, 
+        pca: PCA,
+        autoencoder: AutoEncoder,
         num_representations: int = 10,
-        path: str = None
+        path: Optional[str] = None
 ) -> None:
     """
     Visualizes the PCA vs LAE representations 
@@ -223,7 +228,8 @@ def plot_components_comparison(
         plt.savefig(path, dpi = 150, bbox_inches = 'tight')
     plt.show()
 
-def plot_principal_angles(angles_degrees: np.ndarray, path: str = None) -> None:
+
+def plot_principal_angles(angles_degrees: np.ndarray, path: Optional[str] = None) -> None:
     """
     Plots the principal angles between PCA and LAE subspaces using the output array
     of principal angles in degrees from the compute_subspace_similarity function.
@@ -250,6 +256,7 @@ def plot_principal_angles(angles_degrees: np.ndarray, path: str = None) -> None:
     if path:
         plt.savefig(path, dpi = 150, bbox_inches = 'tight')
     plt.show()
+
 
 def compare_classification_performance(
         X_train: np.ndarray,
@@ -314,11 +321,13 @@ def compare_classification_performance(
         "ae_accuracy": acc_ae,
     }
 
+
+# Summary report
 def summarize_efficiency(
         pca_fit_time: float,
         pca_transform_time: float,
         ae_train_time: float,
-        ae_encode_time: float | None = None,
+        ae_encode_time: Optional[float] = None,
 ) -> None:
     """
     Prints a small summary of computational efficiency for PCA and the autoencoder.
@@ -337,15 +346,13 @@ def summarize_efficiency(
         print(f"AE encode time:        {ae_encode_time:.3f} seconds")
 
 
-
-# Summary report
 def generate_report(
         X: np.ndarray,
         pca: PCA,
         autoencoder: AutoEncoder,
         epoch_losses: List[float],
-        classification_results: Dict[str, float] | None = None,
-        efficiency_stats: Dict[str, float] | None = None,
+        classification_results: Optional[Dict[str, float]] = None,
+        efficiency_stats: Optional[Dict[str, float]] = None,
 ) -> None:
     """
     Generates a comprehensive comparison report.
@@ -399,4 +406,3 @@ def generate_report(
             print(f"Autoencoder training time: {efficiency_stats['ae_train_time']:.3f} seconds")
         if "ae_encode_time" in efficiency_stats:
             print(f"Autoencoder encode time:   {efficiency_stats['ae_encode_time']:.3f} seconds")
-
