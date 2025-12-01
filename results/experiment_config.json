@@ -1,0 +1,43 @@
+{
+  "random_seed": 42,
+  "k_values": [
+    8,
+    32,
+    64,
+    128
+  ],
+  "baseline_hyperparams": {
+    "batch_size": 128,
+    "epochs": 50,
+    "learning_rate": 0.001,
+    "seed": 42
+  },
+  "hyperparam_grid": {
+    "learning_rates": [
+      0.0001,
+      0.001,
+      0.01
+    ],
+    "batch_sizes": [
+      64,
+      128,
+      256
+    ],
+    "seeds": [
+      0,
+      42,
+      123
+    ]
+  },
+  "dataset": {
+    "train_size": 8000,
+    "test_size": 2000,
+    "features": 784
+  },
+  "timing": {
+    "data_load_time": 13.037595510482788,
+    "main_experiments_time": 72.08712840080261,
+    "hyperparameter_experiments_time": 58.833858013153076,
+    "total_time": 143.95858192443848
+  }
+}
