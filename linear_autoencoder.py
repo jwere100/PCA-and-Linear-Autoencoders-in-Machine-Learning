@@ -52,18 +52,26 @@ class AutoEncoder(nn.Module):
         tied_weights (bool): Whether weights are tied
         mean_ (np.ndarray): Mean of training data (stored after training for centered comparison)
     """
-    def __init__(self, k, use_bias=False, tied_weights=True):
+    def __init__(self, k, use_bias=False, tied_weights=True, init_strategy='default'):
         super().__init__()
         self.k = k
         self.use_bias = use_bias
         self.tied_weights = tied_weights
+        self.init_strategy = init_strategy
 
         # Create encoder
         self.encoder = nn.Linear(784, k, bias=use_bias)
 
+        # Apply initialization strategy
+        if init_strategy == 'orthogonal':
+            nn.init.orthogonal_(self.encoder.weight)
+        # 'default' uses PyTorch's default initialization (Xavier-like)
+
         # Create decoder only if weights are not tied
         if not tied_weights:
             self.decoder = nn.Linear(k, 784, bias=use_bias)
+            if init_strategy == 'orthogonal':
+                nn.init.orthogonal_(self.decoder.weight)
         else:
             self.decoder = None
 
@@ -204,7 +212,9 @@ def train_autoencoder(
         seed: int = 0,
         use_bias: bool = False,
         tied_weights: bool = True,
-) -> Tuple[AutoEncoder, list, list, float]:
+        init_strategy: str = 'default',
+        lr_schedule: str = 'constant',
+) -> Tuple[AutoEncoder, list, list, float, float]:
     """
     Trains a linear autoencoder on provided training data.
 
@@ -213,16 +223,19 @@ def train_autoencoder(
         k (int): Bottleneck dimensionality
         batch_size (int): Training batch size
         epochs (int): Number of training epochs
-        learning_rate (float): Optimizer learning rate
+        learning_rate (float): Initial learning rate
         seed (int): Random seed for reproducibility
         use_bias (bool): Whether to use bias terms (Baldi & Hornik requires False)
         tied_weights (bool): Whether decoder = encoder.T (Baldi & Hornik requires True)
+        init_strategy (str): Weight initialization ('default' or 'orthogonal')
+        lr_schedule (str): Learning rate schedule ('constant' or 'cosine')
 
     Returns:
         model (Autoencoder): Trained autoencoder model
         epoch_losses (list): average loss per epoch
         outputs (list): Stored tuples for visualization (epoch, input, reconstruction)
         total_train_time (float): Total training time in seconds
+        peak_memory_mb (float): Peak memory usage in MB
     """
 
     # Set device
@@ -231,11 +244,17 @@ def train_autoencoder(
     print(f"Using device: {device}")
     print(f"Training data shape: {X_train.shape}")
     print(f"Model architecture: 784 → {k} → 784")
-    print(f"Configuration: use_bias={use_bias}, tied_weights={tied_weights}")
+    print(f"Configuration: use_bias={use_bias}, tied_weights={tied_weights}, init={init_strategy}, lr_schedule={lr_schedule}")
     print(f"Hyperparameters: batch_size={batch_size}, epochs={epochs}, lr={learning_rate}")
 
     # Set random seeds for reproducibility
     set_seed(seed)
+
+    # Measure memory usage
+    import psutil
+    import os
+    process = psutil.Process(os.getpid())
+    mem_before = process.memory_info().rss / 1024**2  # MB
 
     # Measure total training time
     train_start = time.time()
@@ -249,12 +268,17 @@ def train_autoencoder(
     data_mean = np.mean(X_train, axis=0)
 
     # Initialize model with configuration
-    model = AutoEncoder(k=k, use_bias=use_bias, tied_weights=tied_weights).to(device)
+    model = AutoEncoder(k=k, use_bias=use_bias, tied_weights=tied_weights, init_strategy=init_strategy).to(device)
     model.mean_ = data_mean
 
     # Define the loss function and optimizer
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(),lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    # Setup learning rate scheduler
+    scheduler = None
+    if lr_schedule == 'cosine':
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
 
 
     # Training tracking
@@ -293,14 +317,23 @@ def train_autoencoder(
         epoch_losses.append(avg_loss)
         print(f"Epoch {epoch+1}/{epochs}, Average Loss: {avg_loss:.6f}")
 
+        # Step the learning rate scheduler if using one
+        if scheduler is not None:
+            scheduler.step()
+
     total_train_time = time.time() - train_start
+
+    # Measure peak memory usage
+    mem_after = process.memory_info().rss / 1024**2  # MB
+    peak_memory_mb = mem_after - mem_before
 
     print(f"\nTraining complete!")
     print(f"Final loss: {epoch_losses[-1]:.6f}")
     print(f"Stored {len(outputs)} batches for visualization")
     print(f"Total training time: {total_train_time:.2f} seconds")
+    print(f"Peak memory usage: {peak_memory_mb:.2f} MB")
 
-    return model, epoch_losses, outputs, total_train_time
+    return model, epoch_losses, outputs, total_train_time, peak_memory_mb
 
 
 def save_model(model: AutoEncoder, filepath: str) -> None:
@@ -316,7 +349,8 @@ def save_model(model: AutoEncoder, filepath: str) -> None:
         'k': model.k,
         'mean_': model.mean_,
         'use_bias': model.use_bias,
-        'tied_weights': model.tied_weights
+        'tied_weights': model.tied_weights,
+        'init_strategy': model.init_strategy
     }
     torch.save(save_dict, filepath)
 
@@ -340,8 +374,9 @@ def load_model(filepath: str) -> AutoEncoder:
     # Load with configuration (backwards compatible with old models)
     use_bias = save_dict.get('use_bias', True)  # Default to True for old models
     tied_weights = save_dict.get('tied_weights', False)  # Default to False for old models
+    init_strategy = save_dict.get('init_strategy', 'default')  # Default for old models
 
-    model = AutoEncoder(k=save_dict['k'], use_bias=use_bias, tied_weights=tied_weights).to(device)
+    model = AutoEncoder(k=save_dict['k'], use_bias=use_bias, tied_weights=tied_weights, init_strategy=init_strategy).to(device)
     model.load_state_dict(save_dict['state_dict'])
     model.mean_ = save_dict['mean_']
 
