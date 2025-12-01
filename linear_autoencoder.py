@@ -15,6 +15,8 @@ from torch.utils.data import DataLoader
 from typing import Tuple
 import time
 import random
+import psutil
+import os
 
 
 def set_seed(seed: int = 0) -> None:
@@ -251,8 +253,6 @@ def train_autoencoder(
     set_seed(seed)
 
     # Measure memory usage
-    import psutil
-    import os
     process = psutil.Process(os.getpid())
     mem_before = process.memory_info().rss / 1024**2  # MB
 
