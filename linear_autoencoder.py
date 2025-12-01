@@ -35,7 +35,7 @@ class AutoEncoder(nn.Module):
     k-dim bottleneck representation (encoder) and to reconstruct the 784-dim
     images (decoder).
 
-    Configurable to match Baldi & Hornik (1989) conditions:
+    Configurable to match Baldi & Hornik (1989) conditions for subspace convergence:
     - use_bias: Whether to include bias terms (default: False)
     - tied_weights: Whether decoder = encoder.T (default: True)
 
