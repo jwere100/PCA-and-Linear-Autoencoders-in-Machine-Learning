@@ -1,8 +1,8 @@
 """
 AutoEncoder Implementation via Pytorch
-@author Joshua Were jow2112@columbia.edu
-@author Nick Meyer njm2179@columbia.edu
-11/28/25
+@author: Joshua Were jow2112@columbia.edu
+@author: Nick Meyer njm2179@columbia.edu
+@date: 11/28/25
 
 Modified by Ayo Adetayo on 11/29/25
 """
@@ -11,11 +11,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from typing import Tuple
 import time
 import random
+
 
 def set_seed(seed: int = 0) -> None:
     """
@@ -26,6 +26,7 @@ def set_seed(seed: int = 0) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
 
 class AutoEncoder(nn.Module):
     """
@@ -140,23 +141,26 @@ class AutoEncoder(nn.Module):
             Z = self.encoder(X_tensor)
         return Z.cpu().numpy()
 
+
 def train_autoencoder(
-        k: int = 50,                    
-        batch_size: int = 64,           
-        epochs: int = 30,               
+        X_train: np.ndarray,
+        k: int = 50,
+        batch_size: int = 64,
+        epochs: int = 30,
         learning_rate: float = 0.001,
-        seed: int = 0,   
-) -> Tuple[AutoEncoder, list, list]:
+        seed: int = 0,
+) -> Tuple[AutoEncoder, list, list, float]:
     """
-    Trains a linear autoencoder on MNIST.
+    Trains a linear autoencoder on provided training data.
 
     Args:
+        X_train (np.ndarray): Training data of shape (n_samples, 784), normalized to [0, 1]
         k (int): Bottleneck dimensionality
         batch_size (int): Training batch size
         epochs (int): Number of training epochs
         learning_rate (float): Optimizer learning rate
         seed (int): Random seed for reproducibility
-    
+
     Returns:
         model (Autoencoder): Trained autoencoder model
         epoch_losses (list): average loss per epoch
@@ -168,6 +172,7 @@ def train_autoencoder(
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     print(f"Using device: {device}")
+    print(f"Training data shape: {X_train.shape}")
     print(f"Model architecture: 784 → {k} → 784")
     print(f"Hyperparameters: batch_size={batch_size}, epochs={epochs}, lr={learning_rate}")
 
@@ -177,13 +182,13 @@ def train_autoencoder(
     # Measure total training time
     train_start = time.time()
 
-    # Import MNIST
-    train_data = datasets.MNIST(root='dataset/',train=True,transform=transforms.ToTensor(),download=True)
-    train_loader = DataLoader(dataset=train_data, batch_size = batch_size, shuffle=True)
+    # Create PyTorch dataset from numpy array
+    X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+    train_dataset = torch.utils.data.TensorDataset(X_train_tensor)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
 
-    # Compute and store training data mean (for fair comparison with PCA
-    all_data = train_data.data.float().view(-1, 784) / 255.0  # Normalize to [0,1]
-    data_mean = all_data.mean(dim=0).numpy()
+    # Compute and store training data mean (for fair comparison with PCA)
+    data_mean = np.mean(X_train, axis=0)
 
     # Initialize model
     model = AutoEncoder(k=k).to(device)
@@ -204,9 +209,9 @@ def train_autoencoder(
         epoch_loss = 0.0
         num_batches = 0
 
-        for images, labels in train_loader:
-            # Flatten from (batch_size, 1, 28, 28) to (batch_size, 784)
-            images = images.view(-1, 28*28).to(device)
+        for batch in train_loader:
+            # Extract images from batch tuple (TensorDataset returns tuples)
+            images = batch[0].to(device)
 
             # Forward pass
             reconstructed = model(images)
@@ -239,6 +244,7 @@ def train_autoencoder(
 
     return model, epoch_losses, outputs, total_train_time
 
+
 def save_model(model: AutoEncoder, filepath: str) -> None:
     """
     Saves the trained model to a file.
@@ -251,6 +257,7 @@ def save_model(model: AutoEncoder, filepath: str) -> None:
     torch.save(save_dict, filepath)
     
     print(f"Model saved to {filepath}")
+
 
 def load_model(filepath: str) -> AutoEncoder:
     """
