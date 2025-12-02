@@ -1,0 +1,42 @@
+{
+  "experiment_mode": 3,
+  "random_seed": 42,
+  "dataset": {
+    "train_size": 56000,
+    "test_size": 14000,
+    "features": 784,
+    "max_samples": null
+  },
+  "timing": {
+    "data_load_time": 13.900910377502441,
+    "optimization_experiments": 4476.042437314987,
+    "total_time": 4489.94334769249
+  },
+  "optimization_config": {
+    "k_values": [
+      8,
+      32,
+      64,
+      128
+    ],
+    "epochs": [
+      50,
+      100,
+      200
+    ],
+    "init_strategies": [
+      "default",
+      "orthogonal"
+    ],
+    "lr_schedules": [
+      "constant",
+      "cosine"
+    ],
+    "base_lr": 0.001,
+    "batch_size": 128,
+    "seed": 42,
+    "use_bias": false,
+    "tied_weights": true,
+    "max_samples": null
+  }
+}

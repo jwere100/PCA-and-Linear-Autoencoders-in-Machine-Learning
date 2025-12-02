@@ -52,7 +52,7 @@ np.random.seed(RANDOM_SEED)
 # 3 = Optimization search (epochs, init, lr_schedule across all k values)
 # 4 = Constraint isolation (tied/untied weights, bias/no bias combinations)
 # 'all' = Run all experiments sequentially
-EXPERIMENT_MODE = 3  # Change this to run different experiments
+EXPERIMENT_MODE = 4  # Change this to run different experiments
 
 # Experiment configuration
 K_VALUES = [8, 32, 64, 128]  # Different latent dimensions to test
@@ -97,7 +97,7 @@ CONSTRAINT_CONFIG = {
         {'use_bias': True, 'tied_weights': True, 'name': 'bias_tied'},
         {'use_bias': True, 'tied_weights': False, 'name': 'bias_untied'},
     ],
-    # Use optimal configuration from experiment 3 for experiment 4
+    # Optimal configuration from experiment 3
     'epochs': 100,
     'init_strategy': 'orthogonal',
     'lr_schedule': 'cosine',
