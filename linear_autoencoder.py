@@ -76,6 +76,11 @@ class AutoEncoder(nn.Module):
                 nn.init.orthogonal_(self.decoder.weight)
         else:
             self.decoder = None
+            # Create separate decoder bias when using tied weights with bias
+            if use_bias:
+                self.decoder_bias = nn.Parameter(torch.zeros(784))
+            else:
+                self.decoder_bias = None
 
         self.mean_ = None
 
@@ -99,9 +104,9 @@ class AutoEncoder(nn.Module):
         if self.tied_weights:
             # Use tied weights: decoder = encoder.T
             reconstructed = torch.matmul(latent, self.encoder.weight)
-            # Add encoder bias if it exists (for decoding it's the "output" bias)
-            if self.use_bias:
-                reconstructed = reconstructed + self.encoder.bias
+            # Add decoder bias if it exists (shape must be 784)
+            if self.use_bias and self.decoder_bias is not None:
+                reconstructed = reconstructed + self.decoder_bias
         else:
             # Use separate decoder
             reconstructed = self.decoder(latent)
@@ -162,8 +167,8 @@ class AutoEncoder(nn.Module):
         """
         if self.use_bias:
             if self.tied_weights:
-                # With tied weights and bias, use encoder bias as output bias
-                return self.encoder.bias.data.cpu().numpy()
+                # With tied weights and bias, use separate decoder bias
+                return self.decoder_bias.data.cpu().numpy()
             else:
                 return self.decoder.bias.data.cpu().numpy()
         else:
