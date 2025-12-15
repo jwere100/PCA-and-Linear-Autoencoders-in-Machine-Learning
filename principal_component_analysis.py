@@ -1,6 +1,6 @@
 """
 Principal Component Analysis (PCA) Implementation
-@author: Roger Fortunato 
+@author: Roger Fortunato (LuckyPrado)
 @author: Ayo Adetayo aa5886@columbia.edu
 @date: 11/29/25
 
